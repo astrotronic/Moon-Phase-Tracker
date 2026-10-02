@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Astronomical Moon Phase Widget</title>
+  <style>
+    /* Scoped Root Variables for Easy Theme Embedding */
+    .lunar-widget-root {
+      --bg-primary: #0b0e14;
+      --bg-card: #151a24;
+      --bg-input: #1f2633;
+      --border-color: #2b3548;
+      --text-main: #f0f4f8;
+      --text-muted: #8c9ba8;
+      --accent-glow: rgba(147, 197, 253, 0.15);
+      --accent-blue: #60a5fa;
+      --accent-gold: #f59e0b;
+      --font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      padding: 24px;
+      max-width: 820px;
+      margin: 0 auto;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      box-sizing: border-box;
+    }
+
+    .lunar-widget-root * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    .lunar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .lunar-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lunar-title span {
+      color: var(--accent-blue);
+    }
+
+    .hemisphere-toggle {
+      display: flex;
+      background: var(--bg-input);
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .hemi-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .hemi-btn.active {
+      background: var(--accent-blue);
+      color: #0b0e14;
+    }
+
+    .lunar-body {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 28px;
+      align-items: center;
+    }
+
+    @media (max-width: 680px) {
+      .lunar-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Canvas Display Frame */
+    .moon-canvas-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, rgba(30, 41, 59, 0.6) 0%, rgba(11, 14, 20, 0.8) 70%);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    canvas#moonCanvas {
+      width: 220px;
+      height: 220px;
+      filter: drop-shadow(0 0 20px var(--accent-glow));
+    }
+
+    .illumination-badge {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-blue);
+      background: rgba(96, 165, 250, 0.1);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+    }
+
+    /* Info Panel */
+    .lunar-details {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .phase-name {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 500px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+
+    .metric-value {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Date & Time Picker UI */
+    .controls-section {
+      background: var(--bg-card);
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .input-group label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .input-group input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      flex: 1;
+      min-width: 50px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      text-align: center;
+    }
+
+    .nav-btn:hover {
+      background: var(--border-color);
+    }
+
+    .nav-btn.today {
+      background: rgba(96, 165, 250, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* Upcoming Events Footer */
+    .upcoming-phases {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-color);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      font-size: 0.8rem;
+    }
+
+    .event-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+    }
+
+    .event-item strong {
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+
+<div class="lunar-widget-root">
+  <!-- Header Controls -->
+  <div class="lunar-header">
+    <div class="lunar-title">
+      <span>🌑</span> Moon Phase Tracker
+    </div>
+    <div class="hemisphere-toggle">
+      <button class="hemi-btn active" id="hemiNorth" onclick="setHemisphere('N')">Northern</button>
+      <button class="hemi-btn" id="hemiSouth" onclick="setHemisphere('S')">Southern</button>
+    </div>
+  </div>
+
+  <!-- Main Grid Content -->
+  <div class="lunar-body">
+    <!-- Visual Render Column -->
+    <div class="moon-canvas-container">
+      <canvas id="moonCanvas"></canvas>
+      <div class="illumination-badge" id="illuminationText">0.0% Illuminated</div>
+    </div>
+
+    <!-- Data & Controls Column -->
+    <div class="lunar-details">
+      <div>
+        <div class="phase-name" id="phaseName">Calculating...</div>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Moon Age</div>
+          <div class="metric-value" id="moonAge">0.0 days</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Distance</div>
+          <div class="metric-value" id="moonDistance">0 km</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Constellation</div>
+          <div class="metric-value" id="moonConstellation">-</div>
+        </div>
+      </div>
+
+      <!-- Date / Time Controls -->
+      <div class="controls-section">
+        <div class="input-row">
+          <div class="input-group">
+            <label for="dateInput">Target Date</label>
+            <input type="date" id="dateInput">
+          </div>
+          <div class="input-group">
+            <label for="timeInput">Time (Local)</label>
+            <input type="time" id="timeInput">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="nav-btn" onclick="stepDate(-30)">-30d</button>
+          <button class="nav-btn" onclick="stepDate(-1)">-1d</button>
+          <button class="nav-btn today" onclick="setToday()">Today</button>
+          <button class="nav-btn" onclick="stepDate(1)">+1d</button>
+          <button class="nav-btn" onclick="stepDate(30)">+30d</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Moon Phases -->
+  <div class="upcoming-phases">
+    <div class="event-item">
+      <span>🌑 Next New Moon:</span>
+      <strong id="nextNewMoon">-</strong>
+    </div>
+    <div class="event-item">
+      <span>🌕 Next Full Moon:</span>
+      <strong id="nextFullMoon">-</strong>
+    </div>
+  </div>
+</div>
+
+<script>
+  /**
+   * Astronomical Algorithms by Jean Meeus + Orthographic Selenographic Ray-Tracer
+   */
+
+  let currentHemisphere = 'N';
+
+  // Utility Math & Angle Functions
+  const toRad = deg => deg * Math.PI / 180;
+  const toDeg = rad => rad * 180 / Math.PI;
+  const fixAngle = deg => (deg % 360 + 360) % 360;
+
+  function getJulianDate(date) {
+    return (date.getTime() / 86400000) + 2440587.5;
+  }
+
+  function calculateMoonDetails(date) {
+    const JD = getJulianDate(date);
+    const T = (JD - 2451545.0) / 36525.0; // Julian centuries since J2000.0
+
+    // Fundamental Arguments (Meeus Ch. 47)
+    const M = fixAngle(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T); // Sun Mean Anomaly
+    const Mp = fixAngle(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T); // Moon Mean Anomaly
+    const D = fixAngle(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T); // Moon Mean Elongation
+    const F = fixAngle(93.2720950 + 483202.0175233 * T - 0.0036539 * T * T); // Moon Argument of Latitude
+
+    // Geocentric Longitudes
+    const L_sun = fixAngle(280.46646 + 36000.76983 * T + 1.914602 * Math.sin(toRad(M)) + 0.019993 * Math.sin(toRad(2 * M)));
+    const L_moon = fixAngle(
+      218.3164477 + 481267.88123421 * T +
+      6.288774 * Math.sin(toRad(Mp)) +
+      1.274027 * Math.sin(toRad(2 * D - Mp)) +
+      0.658314 * Math.sin(toRad(2 * D)) +
+      0.213618 * Math.sin(toRad(2 * Mp)) -
+      0.185116 * Math.sin(toRad(M)) -
+      0.114332 * Math.sin(toRad(2 * F))
+    );
+
+    const elongation = fixAngle(L_moon - L_sun);
+
+    /**
+     * PHASE ANGLE (i):
+     * Derived directly from true geocentric elongation (180° - elongation).
+     * At exact Full Moon (elongation = 180°), phaseAngle = 0°, yielding exactly 100.0% illumination.
+     */
+    const phaseAngle = fixAngle(180 - elongation);
+
+    // Illuminated fraction
+    const fraction = (1 + Math.cos(toRad(phaseAngle))) / 2;
+
+    // Moon Age
+    const age = (elongation / 360) * 29.53058867;
+
+    // Distance in km
+    const distanceKm = 385000.56 - 
+      20905.355 * Math.cos(toRad(Mp)) - 
+      3699.111 * Math.cos(toRad(2 * D - Mp)) - 
+      2955.968 * Math.cos(toRad(2 * D)) - 
+      569.925 * Math.cos(toRad(2 * Mp));
+
+    // Phase Name
+    let phaseName = "";
+    if (elongation >= 354.375 || elongation < 5.625) phaseName = "New Moon";
+    else if (elongation >= 5.625 && elongation < 84.375) phaseName = "Waxing Crescent";
+    else if (elongation >= 84.375 && elongation < 95.625) phaseName = "First Quarter";
+    else if (elongation >= 95.625 && elongation < 174.375) phaseName = "Waxing Gibbous";
+    else if (elongation >= 174.375 && elongation < 185.625) phaseName = "Full Moon";
+    else if (elongation >= 185.625 && elongation < 264.375) phaseName = "Waning Gibbous";
+    else if (elongation >= 264.375 && elongation < 275.625) phaseName = "Third Quarter";
+    else phaseName = "Waning Crescent";
+
+    // True Astronomical IAU Constellation along the Ecliptic
+    function getIAUConstellation(lon) {
+      lon = fixAngle(lon);
+      if (lon >= 351.0 || lon < 28.7) return "Pisces ♓";
+      if (lon >= 28.7 && lon < 53.5) return "Aries ♈";
+      if (lon >= 53.5 && lon < 90.2) return "Taurus ♉";
+      if (lon >= 90.2 && lon < 118.0) return "Gemini ♊";
+      if (lon >= 118.0 && lon < 138.1) return "Cancer ♋";
+      if (lon >= 138.1 && lon < 174.1) return "Leo ♌";
+      if (lon >= 174.1 && lon < 217.8) return "Virgo ♍";
+      if (lon >= 217.8 && lon < 241.1) return "Libra ♎";
+      if (lon >= 241.1 && lon < 248.0) return "Scorpius ♏";
+      if (lon >= 248.0 && lon < 266.3) return "Ophiuchus ♓";
+      if (lon >= 266.3 && lon < 299.7) return "Sagittarius ♐";
+      if (lon >= 299.7 && lon < 327.8) return "Capricornus ♑";
+      return "Aquarius ♒";
+    }
+
+    return {
+      date,
+      elongation,
+      phaseAngle,
+      fraction,
+      percentage: (fraction * 100).toFixed(1),
+      age: age.toFixed(1),
+      distanceKm: Math.round(distanceKm).toLocaleString(),
+      phaseName,
+      constellation: getIAUConstellation(L_moon)
+    };
+  }
+
+  function findNextPhase(fromDate, targetElongation) {
+    // Start initial search 24 hours prior to fromDate.
+    // This allows the full moon date to remain displayed for 24 hours after it occurs.
+    const startDate = new Date(fromDate.getTime() - 86400000);
+    const startDetails = calculateMoonDetails(startDate);
+
+    // Project forward strictly to the upcoming phase
+    let forwardDiff = (targetElongation - startDetails.elongation % 360 + 360) % 360;
+    let initialDays = forwardDiff / (360 / 29.53058867);
+    let t = new Date(startDate.getTime() + initialDays * 86400000);
+
+    // Iterative refinement to exact astronomical precision
+    for (let i = 0; i < 5; i++) {
+      let details = calculateMoonDetails(t);
+      let diff = (targetElongation - details.elongation + 360) % 360;
+      if (diff > 180) diff -= 360;
+      if (Math.abs(diff) < 0.001) break;
+      let daysShift = diff / (360 / 29.53058867);
+      t = new Date(t.getTime() + daysShift * 86400000);
+    }
+    return t;
+  }
+
+  /* --- ACCURATE SELENOGRAPHIC LUNAR FEATURES (3D UNIT VECTORS) --- */
+  // Coordinates in Selenographic Latitude (phi) and Longitude (theta)
+  // +Lat = North, -Lat = South | +Lon = East (Mare Crisium side), -Lon = West (Procellarum side)
+  const rawFeatures = [
+    // Major Maria
+    { name: "Mare Crisium", lat: 17.0, lon: 59.1, rad: 9.0, type: "maria", depth: 0.48 },
+    { name: "Mare Tranquillitatis", lat: 8.5, lon: 31.4, rad: 13.0, type: "maria", depth: 0.42 },
+    { name: "Mare Serenitatis", lat: 28.0, lon: 17.5, rad: 11.0, type: "maria", depth: 0.45 },
+    { name: "Mare Imbrium", lat: 32.8, lon: -15.6, rad: 18.0, type: "maria", depth: 0.48 },
+    { name: "Oceanus Procellarum", lat: 18.4, lon: -57.4, rad: 26.0, type: "maria", depth: 0.40 },
+    { name: "Mare Nubium", lat: -21.3, lon: -16.6, rad: 12.0, type: "maria", depth: 0.42 },
+    { name: "Mare Nectaris", lat: -15.2, lon: 35.5, rad: 7.5, type: "maria", depth: 0.44 },
+    { name: "Mare Fecunditatis", lat: -7.8, lon: 51.3, rad: 11.5, type: "maria", depth: 0.42 },
+    { name: "Mare Humorum", lat: -24.4, lon: -38.6, rad: 8.5, type: "maria", depth: 0.44 },
+    { name: "Mare Frigoris", lat: 56.0, lon: -1.4, rad: 16.0, type: "maria", depth: 0.38 },
+    { name: "Mare Vaporum", lat: 13.3, lon: 3.6, rad: 5.5, type: "maria", depth: 0.42 },
+    { name: "Grimaldi", lat: -5.2, lon: -68.6, rad: 3.5, type: "maria", depth: 0.52 },
+    { name: "Plato", lat: 51.6, lon: -9.3, rad: 2.8, type: "maria", depth: 0.52 },
+
+    // Major Craters & Bright Impact Rays
+    { name: "Tycho", lat: -43.3, lon: -11.2, rad: 3.0, type: "crater", bright: 0.70, rays: true },
+    { name: "Copernicus", lat: 9.6, lon: -20.1, rad: 3.5, type: "crater", bright: 0.60, rays: true },
+    { name: "Aristarchus", lat: 23.7, lon: -47.4, rad: 2.2, type: "crater", bright: 0.85, rays: false },
+    { name: "Kepler", lat: 8.1, lon: -38.0, rad: 2.5, type: "crater", bright: 0.55, rays: true },
+    { name: "Langrenus", lat: -8.9, lon: 61.1, rad: 2.5, type: "crater", bright: 0.48, rays: false },
+    { name: "Stevinus", lat: -32.5, lon: 54.2, rad: 2.2, type: "crater", bright: 0.55, rays: true }
+  ];
+
+  // Pre-calculate 3D vectors on the lunar unit sphere
+  const lunarFeatures = rawFeatures.map(f => {
+    const phi = toRad(f.lat);
+    const theta = toRad(f.lon);
+    return {
+      ...f,
+      x: Math.cos(phi) * Math.sin(theta), // +X = East
+      y: Math.sin(phi),                   // +Y = North
+      z: Math.cos(phi) * Math.cos(theta), // +Z = Earth facing
+      cosRad: Math.cos(toRad(f.rad)),
+      radRad: toRad(f.rad)
+    };
+  });
+
+  /* --- 3D ORTHOGRAPHIC RAY-TRACER CANVAS RENDERER --- */
+  function renderMoonCanvas(details) {
+    const canvas = document.getElementById('moonCanvas');
+    const size = 220;
+    const dpr = window.devicePixelRatio || 1;
+    
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+
+    const ctx = canvas.getContext('2d');
+    const outputImgData = ctx.createImageData(size * dpr, size * dpr);
+    const outData = outputImgData.data;
+
+    const R = (size * dpr / 2) - (2 * dpr);
+    const center = (size * dpr) / 2;
+
+    // Sun light direction vector derived from Elongation Angle
+    let elongRad = toRad(details.elongation);
+    let Lx = Math.sin(elongRad);
+    let Ly = 0;
+    let Lz = -Math.cos(elongRad);
+
+    if (currentHemisphere === 'S') {
+      Lx = -Lx; // Invert horizontal light aspect for Southern Hemisphere view
+    }
+
+    // Earthshine factor (brightest near New Moon)
+    const earthshineStrength = 0.12 * Math.pow((1 + Math.cos(elongRad)) / 2, 1.5);
+
+    for (let y = 0; y < size * dpr; y++) {
+      for (let x = 0; x < size * dpr; x++) {
+        const px = x - center;
+        const py = y - center;
+        const r2 = px * px + py * py;
+
+        if (r2 <= R * R) {
+          // Orthographic 3D Normal Mapping
+          const nx = px / R;
+          const ny_raw = py / R;
+          // Southern hemisphere flips north/south orientation visually
+          const ny = (currentHemisphere === 'S') ? ny_raw : -ny_raw; 
+          const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+
+          // Base Highland Regolith Brightness
+          let albedo = 195;
+
+          // Spherical Procedural Noise (No limb distortion)
+          const latN = Math.asin(Math.min(1, Math.max(-1, ny)));
+          const lonN = Math.atan2(nx, nz);
+          const noise = (Math.sin(latN * 35 + lonN * 40) * 0.5 + Math.sin(latN * 70 - lonN * 50) * 0.5) * 10;
+          albedo += noise;
+
+          // Accurately plot Mare and Craters via 3D Spherical Dot Products
+          for (let i = 0; i < lunarFeatures.length; i++) {
+            const f = lunarFeatures[i];
+            const dot = nx * f.x + ny * f.y + nz * f.z; // Angular distance cosine
+            
+            if (dot > f.cosRad) {
+              const angDist = Math.acos(Math.min(1, Math.max(-1, dot)));
+              const t = 1 - (angDist / f.radRad);
+              const smoothT = t * t * (3 - 2 * t);
+
+              if (f.type === "maria") {
+                albedo -= f.depth * 105 * smoothT;
+              } else if (f.type === "crater") {
+                albedo += f.bright * 90 * smoothT;
+              }
+            }
+
+            // High-precision Ejecta Ray Systems (Tycho, Copernicus, Kepler)
+            if (f.rays && dot > 0.25) {
+              const angDist = Math.acos(Math.min(1, Math.max(-1, dot)));
+              const dX = nx - f.x * dot;
+              const dY = ny - f.y * dot;
+              const rayAngle = Math.atan2(dY, dX);
+              const rayPattern = Math.pow(Math.abs(Math.sin(rayAngle * 8)), 6);
+              const rayFade = Math.exp(-angDist * 2.0);
+              albedo += rayPattern * rayFade * 50 * f.bright;
+            }
+          }
+
+          albedo = Math.min(255, Math.max(0, albedo));
+
+          // Solar Lighting & Shading
+          const lightDot = nx * Lx + (currentHemisphere === 'S' ? -ny_raw : ny_raw) * Ly + nz * Lz;
+
+          let sunlight = 0;
+          let ambient = 0;
+
+          if (lightDot > 0) {
+            sunlight = Math.pow(lightDot, 0.75) * 1.3;
+          } else {
+            ambient = earthshineStrength;
+          }
+
+          // Subtle Limb Darkening
+          const limb = Math.pow(1 - nz, 3) * 0.08;
+
+          const outIdx = (y * (size * dpr) + x) * 4;
+          outData[outIdx]     = Math.min(255, albedo * (sunlight + ambient * 0.8) + limb * 255);
+          outData[outIdx + 1] = Math.min(255, (albedo * 0.98) * (sunlight + ambient * 0.85) + limb * 255);
+          outData[outIdx + 2] = Math.min(255, (albedo * 1.04) * (sunlight + ambient * 1.05) + limb * 255);
+          outData[outIdx + 3] = 255;
+        }
+      }
+    }
+
+    ctx.putImageData(outputImgData, 0, 0);
+  }
+
+  /* --- UI CONTROLLER & EVENT BINDINGS --- */
+  function getSelectedDate() {
+    const dateVal = document.getElementById('dateInput').value;
+    const timeVal = document.getElementById('timeInput').value || "12:00";
+    if (!dateVal) return new Date();
+    return new Date(`${dateVal}T${timeVal}:00`);
+  }
+
+  function updateWidget() {
+    const date = getSelectedDate();
+    const details = calculateMoonDetails(date);
+
+    // Update Text Elements
+    document.getElementById('phaseName').textContent = details.phaseName;
+    document.getElementById('illuminationText').textContent = `${details.percentage}% Illuminated`;
+    document.getElementById('moonAge').textContent = `${details.age} days`;
+    document.getElementById('moonDistance').textContent = `${details.distanceKm} km`;
+    document.getElementById('moonConstellation').textContent = details.constellation;
+
+    // Render 3D Canvas
+    renderMoonCanvas(details);
+
+    // Calculate Next Full & New Moons
+    const nextNew = findNextPhase(date, 0);
+    const nextFull = findNextPhase(date, 180);
+
+    const formatEventDate = d => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    document.getElementById('nextNewMoon').textContent = formatEventDate(nextNew);
+    document.getElementById('nextFullMoon').textContent = formatEventDate(nextFull);
+  }
+
+  function setToday() {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+
+    document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
+    document.getElementById('timeInput').value = `${hh}:${min}`;
+    updateWidget();
+  }
+
+  function stepDate(days) {
+    const currentDate = getSelectedDate();
+    currentDate.setDate(currentDate.getDate() + days);
+    
+    const yyyy = currentDate.getFullYear();
+    const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(currentDate.getDate()).padStart(2, '0');
+    
+    document.getElementById('dateInput').value = `${yyyy}-${mm}-${dd}`;
+    updateWidget();
+  }
+
+  function setHemisphere(hemi) {
+    currentHemisphere = hemi;
+    document.getElementById('hemiNorth').classList.toggle('active', hemi === 'N');
+    document.getElementById('hemiSouth').classList.toggle('active', hemi === 'S');
+    updateWidget();
+  }
+
+  // Initialization
+  window.addEventListener('DOMContentLoaded', () => {
+    setToday();
+    document.getElementById('dateInput').addEventListener('change', updateWidget);
+    document.getElementById('timeInput').addEventListener('change', updateWidget);
+  });
+</script>
+
+</body>
+</html>
